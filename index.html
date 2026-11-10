@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="id" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#101114">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>MY HABITS</title>
+    
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="manifest.json">
+    
+    <!-- Apple Touch Icons -->
+    <link rel="apple-touch-icon" href="icon-192.png">
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        bgMain: '#101114',
+                        bgSecondary: '#16171B',
+                        cardBg: '#1C1E23',
+                        primaryOrange: '#FF8A32',
+                        textMain: '#FFFFFF',
+                        textSecondary: '#A0A0A0',
+                        borderSubtle: '#303138',
+                        successGreen: '#36C985',
+                        warningYellow: '#F5B84B'
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        body { 
+            font-family: 'Inter', sans-serif; 
+            background-color: #101114; 
+            color: #FFFFFF; 
+            -webkit-tap-highlight-color: transparent; 
+            overscroll-behavior-y: none;
+        }
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        
+        /* Safe Area Spacing for PWA/iOS */
+        .pt-safe { padding-top: env(safe-area-inset-top, 20px); }
+        .pb-safe { padding-bottom: env(safe-area-inset-bottom, 20px); }
+        .min-h-screen-safe { min-height: calc(100vh + env(safe-area-inset-top)); }
+        
+        /* Disable text selection for app-like feel */
+        .no-select {
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            -khtml-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+        }
+    </style>
+</head>
+<body class="no-select">
+    <div id="root"></div>
+    
+    <!-- PWA Service Worker Registration -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('sw.js')
+                    .then(registration => {
+                        console.log('ServiceWorker registration successful');
+                    })
+                    .catch(err => {
+                        console.log('ServiceWorker registration failed: ', err);
+                    });
+            });
+        }
+    </script>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        const translations = {
+            id: {
+                home: 'Beranda', planner: 'Jadwal', goals: 'Target', ai: 'Asisten AI', profile: 'Profil',
+                greeting: 'Halo, Ade!', today: 'Hari ini', progress: 'Progres Harian',
+                tasksCompleted: 'Tugas Selesai', totalTasks: 'Total Tugas', keepItUp: 'Pertahankan semangatmu!',
+                activeGoals: 'Target Aktif', completedHabits: 'Kebiasaan Selesai', focusTime: 'Waktu Fokus',
+                upcoming: 'Jadwal Mendatang', quickActions: 'Aksi Cepat', aiInsight: 'Wawasan AI',
+                insightText: 'Kamu paling produktif di pagi hari. Jadwalkan tugas beratmu sekarang!',
+                habitOverview: 'Ringkasan Kebiasaan', addTask: 'Tambah Tugas', addHabit: 'Tambah Kebiasaan',
+                createGoal: 'Buat Target', startFocus: 'Mulai Fokus', settings: 'Pengaturan',
+                language: 'Bahasa', logout: 'Keluar', askAi: 'Tanya sesuatu pada AI...',
+                installApp: 'Instal Aplikasi', installDesc: 'Tambahkan ke layar utama untuk akses lebih cepat dan pengalaman penuh.'
+            },
+            en: {
+                home: 'Home', planner: 'Planner', goals: 'Goals', ai: 'AI Assistant', profile: 'Profile',
+                greeting: 'Hello, Ade!', today: 'Today', progress: 'Daily Progress',
+                tasksCompleted: 'Tasks Completed', totalTasks: 'Total Tasks', keepItUp: 'Keep it up!',
+                activeGoals: 'Active Goals', completedHabits: 'Completed Habits', focusTime: 'Focus Time',
+                upcoming: 'Upcoming Schedule', quickActions: 'Quick Actions', aiInsight: 'AI Insight',
+                insightText: 'You are most productive in the morning. Schedule your hard tasks now!',
+                habitOverview: 'Habit Overview', addTask: 'Add Task', addHabit: 'Add Habit',
+                createGoal: 'Create Goal', startFocus: 'Start Focus', settings: 'Settings',
+                language: 'Language', logout: 'Logout', askAi: 'Ask AI something...',
+                installApp: 'Install App', installDesc: 'Add to home screen for faster access and full experience.'
+            }
+        };
+
+        const App = () => {
+            const [activeTab, setActiveTab] = useState('home');
+            const [lang, setLang] = useState('id');
+            const [deferredPrompt, setDeferredPrompt] = useState(null);
+            const [isInstallable, setIsInstallable] = useState(false);
+            const t = translations[lang];
+
+            useEffect(() => {
+                // Listen for beforeinstallprompt to show install button
+                window.addEventListener('beforeinstallprompt', (e) => {
+                    e.preventDefault();
+                    setDeferredPrompt(e);
+                    setIsInstallable(true);
+                });
+
+                // Check if already installed
+                if (window.matchMedia('(display-mode: standalone)').matches) {
+                    setIsInstallable(false);
+                }
+            }, []);
+
+            const handleInstallClick = async () => {
+                if (deferredPrompt) {
+                    deferredPrompt.prompt();
+                    const { outcome } = await deferredPrompt.userChoice;
+                    if (outcome === 'accepted') {
+                        setIsInstallable(false);
+                    }
+                    setDeferredPrompt(null);
+                }
+            };
+
+            const Icon = ({ name, className }) => {
+                useEffect(() => {
+                    lucide.createIcons();
+                });
+                return <i data-lucide={name} className={className}></i>;
+            };
+
+            // ... (Tab components remain largely the same, just adding install banner in Profile or Home)
+
+            const HomeTab = () => (
+                <div className="p-5 pt-safe pb-28 space-y-6">
+                    <header className="flex justify-between items-center pt-2">
+                        <div>
+                            <h1 className="text-2xl font-bold text-primaryOrange tracking-tight">MY HABITS</h1>
+                            <p className="text-textSecondary text-sm mt-1">{t.greeting}</p>
+                        </div>
+                        <div className="flex gap-4 items-center">
+                            <button className="relative p-2 bg-cardBg rounded-full border border-borderSubtle hover:border-primaryOrange transition-colors">
+                                <Icon name="bell" className="w-5 h-5 text-textMain" />
+                                <span className="absolute top-1 right-1 w-2 h-2 bg-primaryOrange rounded-full"></span>
+                            </button>
+                            <div className="w-10 h-10 bg-primaryOrange rounded-full flex items-center justify-center font-bold text-bgMain shadow-lg">A</div>
+                        </div>
+                    </header>
+
+                    {isInstallable && (
+                        <div className="bg-primaryOrange/10 border border-primaryOrange rounded-2xl p-4 flex items-center justify-between">
+                            <div>
+                                <h3 className="font-bold text-primaryOrange text-sm">{t.installApp}</h3>
+                                <p className="text-xs text-textSecondary mt-1">{t.installDesc}</p>
+                            </div>
+                            <button onClick={handleInstallClick} className="bg-primaryOrange text-bgMain px-4 py-2 rounded-xl text-sm font-bold shadow-md whitespace-nowrap ml-3">
+                                Install
+                            </button>
+                        </div>
+                    )}
+
+                    {/* Daily Progress */}
+                    <section className="bg-cardBg p-5 rounded-2xl border border-borderSubtle flex items-center justify-between shadow-sm">
+                        <div>
+                            <h2 className="text-lg font-semibold">{t.progress}</h2>
+                            <p className="text-textSecondary text-sm mt-1">{t.tasksCompleted}: <span className="text-textMain font-medium">5 / 8</span></p>
+                            <p className="text-successGreen text-xs mt-2 font-medium bg-successGreen/10 inline-block px-2 py-1 rounded-md">{t.keepItUp}</p>
+                        </div>
+                        <div className="relative w-16 h-16 rounded-full border-4 border-borderSubtle flex items-center justify-center shadow-inner">
+                            <svg className="absolute w-full h-full transform -rotate-90">
+                                <circle cx="28" cy="28" r="28" stroke="currentColor" strokeWidth="4" fill="transparent" className="text-borderSubtle" />
+                                <circle cx="28" cy="28" r="28" stroke="currentColor" strokeWidth="4" fill="transparent" strokeDasharray="175" strokeDashoffset="65" className="text-primaryOrange" />
+                            </svg>
+                            <span className="font-bold text-sm relative z-10">62%</span>
+                        </div>
+                    </section>
+
+                    {/* Stats */}
+                    <section className="grid grid-cols-3 gap-3">
+                        <div className="bg-cardBg p-4 rounded-2xl border border-borderSubtle text-center shadow-sm">
+                            <div className="text-primaryOrange font-bold text-2xl">3</div>
+                            <div className="text-xs text-textSecondary mt-1 font-medium">{t.activeGoals}</div>
+                        </div>
+                        <div className="bg-cardBg p-4 rounded-2xl border border-borderSubtle text-center shadow-sm">
+                            <div className="text-successGreen font-bold text-2xl">12</div>
+                            <div className="text-xs text-textSecondary mt-1 font-medium">{t.completedHabits}</div>
+                        </div>
+                        <div className="bg-cardBg p-4 rounded-2xl border border-borderSubtle text-center shadow-sm">
+                            <div className="text-warningYellow font-bold text-2xl">4h</div>
+                            <div className="text-xs text-textSecondary mt-1 font-medium">{t.focusTime}</div>
+                        </div>
+                    </section>
+
+                    {/* AI Insight */}
+                    <section className="bg-bgSecondary p-4 rounded-2xl border border-borderSubtle flex gap-4 items-start relative overflow-hidden">
+                        <div className="absolute top-0 right-0 w-24 h-24 bg-primaryOrange/5 rounded-full -mr-8 -mt-8 blur-xl"></div>
+                        <div className="p-2.5 bg-cardBg rounded-xl text-primaryOrange border border-borderSubtle relative z-10">
+                            <Icon name="sparkles" className="w-5 h-5" />
+                        </div>
+                        <div className="relative z-10">
+                            <h3 className="font-semibold text-sm text-textMain">{t.aiInsight}</h3>
+                            <p className="text-textSecondary text-xs mt-1.5 leading-relaxed">{t.insightText}</p>
+                        </div>
+                    </section>
+
+                     {/* Quick Actions Grid */}
+                     <section>
+                        <h3 className="text-sm font-semibold text-textSecondary mb-3">{t.quickActions}</h3>
+                        <div className="grid grid-cols-2 gap-3">
+                            <button className="bg-cardBg p-3 rounded-xl border border-borderSubtle flex items-center justify-center gap-2 text-sm font-medium hover:bg-borderSubtle transition-colors active:scale-95">
+                                <Icon name="plus-circle" className="w-4 h-4 text-primaryOrange" /> {t.addTask}
+                            </button>
+                            <button className="bg-cardBg p-3 rounded-xl border border-borderSubtle flex items-center justify-center gap-2 text-sm font-medium hover:bg-borderSubtle transition-colors active:scale-95">
+                                <Icon name="check-circle" className="w-4 h-4 text-successGreen" /> {t.addHabit}
+                            </button>
+                        </div>
+                    </section>
+                </div>
+            );
+
+            const ProfileTab = () => (
+                <div className="p-5 pt-safe pb-28">
+                    <h2 className="text-xl font-bold mb-6 tracking-tight pt-2">{t.profile}</h2>
+                    <div className="flex items-center gap-4 mb-8 bg-cardBg p-4 rounded-2xl border border-borderSubtle">
+                        <div className="w-16 h-16 bg-primaryOrange rounded-full flex items-center justify-center text-2xl font-bold text-bgMain">A</div>
+                        <div>
+                            <h3 className="font-bold text-lg">Ade Kholifatonatiyas</h3>
+                            <p className="text-textSecondary text-xs mt-0.5">adepinart@gmail.com</p>
+                            <span className="inline-block mt-2 px-2 py-1 bg-bgSecondary border border-borderSubtle rounded text-[10px] text-primaryOrange font-medium">SMKN 1 Pengasih</span>
+                        </div>
+                    </div>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className="text-xs font-semibold text-textSecondary uppercase tracking-wider mb-2 ml-1">{t.settings}</h4>
+                            <div className="bg-cardBg rounded-2xl border border-borderSubtle overflow-hidden">
+                                <div className="p-4 flex justify-between items-center border-b border-borderSubtle">
+                                    <div className="flex items-center gap-3"><Icon name="globe" className="w-5 h-5 text-textSecondary" /> <span className="text-sm font-medium">{t.language}</span></div>
+                                    <select className="bg-bgSecondary border border-borderSubtle rounded-lg px-2 py-1.5 text-xs focus:outline-none font-medium" value={lang} onChange={(e) => setLang(e.target.value)}>
+                                        <option value="id">Bahasa Indonesia</option>
+                                        <option value="en">English</option>
+                                    </select>
+                                </div>
+                                <div className="p-4 flex justify-between items-center">
+                                    <div className="flex items-center gap-3"><Icon name="moon" className="w-5 h-5 text-textSecondary" /> <span className="text-sm font-medium">Dark Theme</span></div>
+                                    <div className="w-10 h-6 bg-primaryOrange rounded-full relative"><div className="w-4 h-4 bg-bgMain rounded-full absolute right-1 top-1"></div></div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        {isInstallable && (
+                            <button onClick={handleInstallClick} className="w-full bg-primaryOrange text-bgMain p-4 rounded-2xl font-bold flex items-center justify-center gap-2 active:scale-95 transition-transform shadow-lg">
+                                <Icon name="download" className="w-5 h-5" /> {t.installApp}
+                            </button>
+                        )}
+
+                        <button className="w-full bg-cardBg p-4 rounded-2xl border border-red-500/20 flex items-center justify-center gap-2 text-red-500 text-sm font-medium hover:bg-red-500/10 transition-colors active:scale-95">
+                            <Icon name="log-out" className="w-5 h-5" /> {t.logout}
+                        </button>
+                    </div>
+                </div>
+            );
+
+            // AiTab simplified for brevity in this snippet
+            const AiTab = () => (
+                <div className="p-5 pt-safe h-screen flex flex-col pb-28">
+                    <header className="mb-4 pt-2">
+                        <h2 className="text-xl font-bold tracking-tight">{t.ai}</h2>
+                        <p className="text-xs text-textSecondary mt-1">Powered by Gemini</p>
+                    </header>
+                    <div className="flex-1 bg-cardBg rounded-2xl p-4 border border-borderSubtle overflow-y-auto mb-4 flex flex-col gap-4">
+                        <div className="flex gap-3">
+                            <div className="w-8 h-8 min-w-[32px] bg-primaryOrange rounded-full flex items-center justify-center"><Icon name="bot" className="w-4 h-4 text-bgMain" /></div>
+                            <div className="bg-bgSecondary p-3 rounded-2xl rounded-tl-none text-sm text-textMain max-w-[85%] border border-borderSubtle leading-relaxed">
+                                {lang === 'id' ? 'Halo, Ade! Saya siap membantu mengatur jadwal belajarmu hari ini.' : 'Hello, Ade! I am ready to help organize your schedule today.'}
+                            </div>
+                        </div>
+                    </div>
+                    <div className="flex gap-2">
+                        <input type="text" placeholder={t.askAi} className="flex-1 bg-cardBg border border-borderSubtle rounded-2xl px-4 py-3.5 text-sm focus:outline-none focus:border-primaryOrange transition-colors" />
+                        <button className="bg-primaryOrange px-4 rounded-2xl text-bgMain hover:opacity-90 transition-opacity flex items-center justify-center">
+                            <Icon name="send" className="w-5 h-5" />
+                        </button>
+                    </div>
+                </div>
+            );
+
+            return (
+                <div className="max-w-md mx-auto h-[100dvh] min-h-screen-safe relative bg-bgMain overflow-hidden sm:rounded-3xl sm:h-[850px] sm:mt-10 sm:border sm:border-borderSubtle sm:shadow-2xl">
+                    <div className="h-full overflow-y-auto hide-scrollbar">
+                        {activeTab === 'home' && <HomeTab />}
+                        {activeTab === 'planner' && <div className="p-5 pt-safe flex items-center justify-center h-full text-textSecondary">{t.planner} - Coming Soon</div>}
+                        {activeTab === 'goals' && <div className="p-5 pt-safe flex items-center justify-center h-full text-textSecondary">{t.goals} - Coming Soon</div>}
+                        {activeTab === 'ai' && <AiTab />}
+                        {activeTab === 'profile' && <ProfileTab />}
+                    </div>
+
+                    {/* Premium Glassmorphism Bottom Navigation with safe area padding */}
+                    <div className="absolute bottom-0 left-0 w-full p-4 pb-safe bg-gradient-to-t from-bgMain via-bgMain to-transparent pointer-events-none z-50">
+                        <nav className="bg-cardBg/90 backdrop-blur-xl border border-borderSubtle rounded-2xl px-2 py-3 flex justify-between items-center shadow-[0_8px_30px_rgb(0,0,0,0.5)] pointer-events-auto">
+                            {[
+                                { id: 'home', icon: 'home', label: t.home },
+                                { id: 'planner', icon: 'calendar', label: t.planner },
+                                { id: 'goals', icon: 'target', label: t.goals },
+                                { id: 'ai', icon: 'bot', label: t.ai },
+                                { id: 'profile', icon: 'user', label: t.profile }
+                            ].map(tab => (
+                                <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex flex-col items-center gap-1.5 w-1/5 transition-colors active:scale-90 ${activeTab === tab.id ? 'text-primaryOrange' : 'text-textSecondary hover:text-textMain'}`}>
+                                    <div className={`p-1.5 rounded-xl transition-colors ${activeTab === tab.id ? 'bg-primaryOrange/10' : ''}`}>
+                                        <Icon name={tab.icon} className="w-5 h-5" />
+                                    </div>
+                                    <span className="text-[9px] font-semibold">{tab.label}</span>
+                                </button>
+                            ))}
+                        </nav>
+                    </div>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
